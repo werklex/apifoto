@@ -10,6 +10,9 @@ h1{margin:0 0 5px;font-size:23px}.small{font-size:13px;color:#66717b}.article{fo
 button,input{font:inherit}button{width:100%;padding:19px 16px;margin-top:12px;border:0;border-radius:15px;color:white;background:#1769e0;font-weight:850;font-size:19px;min-height:58px;box-shadow:0 2px 5px #0002}
 .green{background:#198754}.gray{background:#687580}.red{background:#c0392b}.yellow{background:#a66b00}
 #done{font-size:21px;min-height:68px}#skip{font-size:18px;min-height:62px}#cam{font-size:21px;min-height:64px}
+#saveNext{font-size:20px;min-height:72px}#nextNoSave{font-size:18px;min-height:64px}
+#reviewBox{margin-top:8px}
+
 button:active{transform:scale(.985)}
 
 button:disabled{opacity:.45}video,img{width:100%;border-radius:12px;margin-top:10px;background:#111}video,img{display:none}
@@ -24,13 +27,21 @@ button:disabled{opacity:.45}video,img{width:100%;border-radius:12px;margin-top:1
 <div id="stats" class="stats"></div>
 <div id="counter" class="small"></div>
 <div id="article" class="article"></div><div id="location" class="location"></div><div id="gps" class="small"></div>
-<button id="cam">📷 Camera openen & toestemming vragen</button>
-<button id="help" class="gray">🔐 Camera-toegang herstellen</button><video id="video" autoplay playsinline></video>
-<button id="take" class="green" style="display:none">Maak foto</button>
-<img id="preview">
-<button id="retake" class="gray" style="display:none">Opnieuw</button>
-<button id="done" class="green" disabled>✓ Artikel klaar — volgende</button>
-<button id="skip" class="yellow">⏭️ Niet gevonden / niet op voorraad — overslaan</button>
+<button id="cam">📷 CAMERA OPENEN</button>
+<button id="help" class="gray">🔐 Camera-toegang herstellen</button>
+<div id="cameraHint" class="status" style="display:none">📸 Maak eerst een foto. Daarna kun je de foto controleren.</div>
+<video id="video" autoplay playsinline></video>
+<button id="take" class="green" style="display:none">📸 FOTO MAKEN</button>
+<div id="reviewBox" style="display:none">
+  <div style="font-size:18px;font-weight:850;margin-top:12px">👀 FOTO CONTROLEREN</div>
+  <div class="small">Is de foto duidelijk en staat het juiste artikel erop?</div>
+  <img id="preview">
+  <button id="saveNext" class="green">✅ FOTO GOED — OPSLAAN & VOLGEND ARTIKEL</button>
+  <button id="retake" class="gray">📷 OPNIEUW FOTO</button>
+  <button id="nextNoSave" class="yellow">➡️ VOLGEND ARTIKEL — FOTO NIET OPSLAAN</button>
+</div>
+<button id="done" class="green" disabled style="display:none">✓ Artikel klaar — volgende</button>
+<button id="skip" class="yellow">⏭️ NIET GEVONDEN / NIET OP VOORRAAD — OVERSLAAN</button>
 <div id="status" class="status"></div>
 </div>
 
@@ -72,8 +83,9 @@ function show(){
  $("counter").textContent=`Artikel ${state.index+1} van ${rows.length}`;
  $("article").textContent=r.article;$("location").textContent="📍 "+(r.location||"Geen locatie");
  $("status").textContent="Ga naar de locatie en neem een foto.";
- currentBlob=null;$("preview").style.display="none";$("retake").style.display="none";$("done").disabled=true;
- if(stream){$("video").style.display="block";$("take").style.display="block";$("cam").style.display="none";} else {stop();}
+ currentBlob=null;$("preview").style.display="none";$("reviewBox").style.display="none";$("done").disabled=true;
+ stopCameraOnly();
+ $("status").textContent="Ga naar de locatie en neem een foto. Controleer de foto vóór je opslaat.";
  if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>$("gps").textContent=`GPS: ${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}`,()=>{});
 }
 $("excel").onchange=async e=>{
@@ -86,7 +98,7 @@ $("excel").onchange=async e=>{
 };
 async function openCamera(){
   if(!window.isSecureContext){
-    $("status").textContent="De camera werkt alleen via HTTPS. Open deze app via een beveiligde webpagina (https://) of voeg ze toe aan het beginscherm vanuit een beveiligde pagina.";
+    $("status").textContent="De camera werkt alleen via HTTPS. Open deze app via een beveiligde webpagina.";
     return;
   }
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
@@ -94,20 +106,23 @@ async function openCamera(){
     return;
   }
   try{
-    $("status").textContent="De gsm vraagt nu toestemming voor de camera. Kies 'Sta toe' / 'Allow'.";
+    $("status").textContent="De gsm vraagt toestemming voor de camera. Kies 'Toestaan' / 'Allow' als dit verschijnt.";
     stream=await navigator.mediaDevices.getUserMedia({
       video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},
       audio:false
     });
     $("video").srcObject=stream;
     $("video").style.display="block";
+    $("cameraHint").style.display="block";
     $("take").style.display="block";
     $("cam").style.display="none";
-    $("status").textContent="Camera toegestaan. Richt op het artikel en maak de foto.";
+    $("help").style.display="none";
+    $("reviewBox").style.display="none";
+    $("status").textContent="Camera open. Maak de foto van het artikel hierboven.";
   }catch(e){
     let msg="Camera-toegang is geweigerd.";
     if(e.name==="NotAllowedError" || e.name==="PermissionDeniedError"){
-      msg+=" Open de camera-instellingen van je browser en zet Camera op 'Toestaan'. Daarna druk je opnieuw op 'Camera openen'.";
+      msg+=" Open de camera-instellingen van Chrome en zet Camera op 'Toestaan'. Daarna druk je opnieuw op 'Camera openen'.";
     }else if(e.name==="NotFoundError"){
       msg+=" Er werd geen camera gevonden.";
     }else if(e.name==="SecurityError"){
@@ -119,46 +134,108 @@ async function openCamera(){
   }
 }
 $("cam").onclick=openCamera;
+
 $("take").onclick=()=>{
- let v=$("video"),c=document.createElement("canvas");c.width=v.videoWidth||1280;c.height=v.videoHeight||720;c.getContext("2d").drawImage(v,0,0,c.width,c.height);
- c.toBlob(b=>{
-   currentBlob=b;$("preview").src=URL.createObjectURL(b);$("preview").style.display="block";
-   $("retake").style.display="block";$("done").disabled=false;
-   $("status").textContent="Foto genomen. Controleer de foto of druk op 'Artikel klaar'. De camera blijft actief.";
- },"image/jpeg",.9)
+  let v=$("video"),c=document.createElement("canvas");
+  c.width=v.videoWidth||1280;c.height=v.videoHeight||720;
+  c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+  c.toBlob(b=>{
+    currentBlob=b;
+    // Stop the live camera immediately after the photo.
+    stopCameraOnly();
+    $("preview").src=URL.createObjectURL(b);
+    $("reviewBox").style.display="block";
+    $("done").disabled=true;
+    $("status").textContent="Controleer de voorbeeldfoto. Kies daarna opslaan, opnieuw fotograferen of naar het volgende artikel.";
+  },"image/jpeg",.9);
 };
+
 $("retake").onclick=()=>{
-  $("preview").style.display="none";$("retake").style.display="none";currentBlob=null;$("done").disabled=true;
-  if(stream){$("video").style.display="block";$("take").style.display="block";$("cam").style.display="none";$("status").textContent="Neem opnieuw de foto."}
-  else{openCamera()}
+  $("reviewBox").style.display="none";
+  currentBlob=null;
+  openCamera();
 };
-$("done").onclick=()=>{
- if(!currentBlob)return;let r=rows[state.index];
- let rd=new FileReader();rd.onload=()=>{state.photos.push({article:r.article,location:r.location,data:rd.result});state.done.push(r.article);state.index++;persist();show();
-  // Keep the camera permission/session ready for the next article.
-  if(stream){$("status").textContent="Volgend artikel. Camera blijft klaar voor de volgende foto."}
-};rd.readAsDataURL(currentBlob);
+
+$("saveNext").onclick=()=>{
+  if(!currentBlob)return;
+  let r=rows[state.index];
+  let rd=new FileReader();
+  rd.onload=()=>{
+    state.photos.push({article:r.article,location:r.location,data:rd.result});
+    state.done.push(r.article);
+    state.index++;
+    persist();
+    currentBlob=null;
+    show();
+  };
+  rd.readAsDataURL(currentBlob);
 };
+
+$("nextNoSave").onclick=()=>{
+  let r=rows[state.index];
+  if(confirm("Deze foto niet opslaan en naar het volgende artikel gaan?")){
+    state.skipped.push(r.article);
+    state.index++;
+    currentBlob=null;
+    persist();
+    show();
+  }
+};
+
+$("done").onclick=()=>{ /* hidden; replaced by saveNext */ };
+
 $("skip").onclick=()=>{
- let r=rows[state.index];
- state.skipped.push(r.article);state.index++;persist();show();
+  let r=rows[state.index];
+  if(confirm("Artikel '"+r.article+"' overslaan? Het komt daarna niet opnieuw terug.")){
+    state.skipped.push(r.article);
+    state.index++;
+    currentBlob=null;
+    persist();
+    show();
+  }
 };
+
 $("reset").onclick=()=>{
- if(confirm("ALLE opgeslagen foto's, klaar/overgeslagen status en voortgang verwijderen?")){state={index:0,done:[],skipped:[],photos:[]};persist();show()}
+  if(confirm("ALLE opgeslagen foto's, klaar/overgeslagen status en voortgang verwijderen?")){
+    state={index:0,done:[],skipped:[],photos:[]};
+    persist();show();
+  }
 };
+
 $("send").onclick=async()=>{
  if(!state.photos.length){alert("Er zijn nog geen foto's.");return}
- if(!window.JSZip){await new Promise((ok,no)=>{let s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
+ if(!window.JSZip){await new Promise((ok,no)=>{let sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";sc.onload=ok;sc.onerror=no;document.head.appendChild(sc)})}
  let z=new JSZip(),f=z.folder("artikel_fotos"),used={};
- for(let p of state.photos){let n=p.article+".jpg",base=p.article,i=1;while(used[n])n=base+"_"+(++i)+".jpg";used[n]=1;f.file(n,p.data.split(",")[1],{base64:true})}
+ for(let p of state.photos){
+   let n=p.article+".jpg",base=p.article,i=1;
+   while(used[n])n=base+"_"+(++i)+".jpg";
+   used[n]=1;f.file(n,p.data.split(",")[1],{base64:true});
+ }
  let skippedText=state.skipped.length?state.skipped.join("\n"):"Geen overgeslagen artikelen.";
  z.file("NIET_GEVONDEN.txt",skippedText);
- let blob=await z.generateAsync({type:"blob",compression:"DEFLATE"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ATS_artikel_fotos.zip";a.click();
+ let blob=await z.generateAsync({type:"blob",compression:"DEFLATE"});
+ let a=document.createElement("a");a.href=URL.createObjectURL(blob);
+ a.download="ATS_artikel_fotos.zip";a.click();
 };
+
 $("help").onclick=()=>{
-  $("status").textContent="Als je eerder 'Weiger' hebt gekozen, kan de webpagina de toestemming niet zelf opnieuw aanzetten. Ga op je gsm naar de browserinstellingen → deze website → Camera → Toestaan. Open daarna de app opnieuw en druk op 'Camera openen'.";
+  $("status").textContent="Als je eerder 'Weiger' hebt gekozen, kan de website die keuze niet zelf terugdraaien. Ga in Chrome naar Instellingen → Site-instellingen → Camera → deze website → Toestaan. Open daarna de app opnieuw.";
 };
-function stop(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$("video").style.display="none";$("take").style.display="none";$("cam").style.display="block"}
+
+function stopCameraOnly(){
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+    stream=null;
+  }
+  $("video").srcObject=null;
+  $("video").style.display="none";
+  $("take").style.display="none";
+  $("cameraHint").style.display="none";
+  $("cam").style.display="block";
+  $("help").style.display="block";
+}
+
+function stop(){stopCameraOnly();$("reviewBox").style.display="none";}
 
 function showPermissionModal(reason){
   const isApple=/iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -177,21 +254,7 @@ $("permissionTry").onclick=async()=>{
 };
 $("permissionClose").onclick=()=>{$("permissionModal").style.display="none"};
 
-async function checkCameraOnStart(){
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)return;
-  try{
-    // Ask once at startup. If already granted, this opens the camera without another prompt.
-    const test=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
-    test.getTracks().forEach(t=>t.stop());
-  }catch(e){
-    if(e.name==="NotAllowedError" || e.name==="PermissionDeniedError"){
-      showPermissionModal("De browser heeft de camera geweigerd.");
-    }
-  }
-}
-
 $("fileInfo").textContent=`Standaardlijst geladen: ${rows.length} artikelen.`;
-checkCameraOnStart();
 show();
 </script>
 <div id="permissionModal" style="display:none;position:fixed;inset:0;background:#0009;z-index:9999;padding:18px;align-items:center;justify-content:center">
