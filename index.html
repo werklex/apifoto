@@ -5,12 +5,12 @@
 <style>
 *{box-sizing:border-box}body{margin:0;background:#eef2f5;font-family:system-ui,-apple-system,sans-serif;color:#18212b}
 .wrap{max-width:700px;margin:auto;padding:12px}.card{background:#fff;border-radius:18px;padding:18px;margin:10px 0;box-shadow:0 3px 14px #0001}
-h1{margin:0 0 5px;font-size:23px}.small{font-size:13px;color:#66717b}.article{font-size:31px;font-weight:850;word-break:break-word;margin-top:7px}.location{font-size:21px;font-weight:700;margin-top:4px;word-break:break-word}
+h1{margin:0 0 5px;font-size:23px}.small{font-size:13px;color:#66717b}.article{font-size:34px;font-weight:900;word-break:break-word;margin-top:7px;background:#fff3cd;border:3px solid #f0b400;border-radius:14px;padding:12px}.location{font-size:25px;font-weight:900;margin-top:8px;word-break:break-word;background:#e8f4ff;border:3px solid #1769e0;border-radius:14px;padding:12px}
 .stats{font-weight:750;margin:7px 0}.status{background:#eef2f5;border-radius:11px;padding:11px;margin-top:10px;white-space:pre-wrap}
 button,input{font:inherit}button{width:100%;padding:19px 16px;margin-top:12px;border:0;border-radius:15px;color:white;background:#1769e0;font-weight:850;font-size:19px;min-height:58px;box-shadow:0 2px 5px #0002}
-.green{background:#198754}.gray{background:#687580}.red{background:#c0392b}.yellow{background:#a66b00}
+.green{background:#198754}.blue{background:#1769e0}.gray{background:#687580}.red{background:#c0392b}.yellow{background:#a66b00}
 #done{font-size:21px;min-height:68px}#skip{font-size:18px;min-height:62px}#cam{font-size:21px;min-height:64px}
-#saveNext{font-size:20px;min-height:72px}#nextNoSave{font-size:18px;min-height:64px}
+#saveNext{font-size:20px;min-height:72px}#another{font-size:20px;min-height:68px}#finishArticle{font-size:20px;min-height:72px}#nextNoSave{font-size:18px;min-height:64px}
 #reviewBox{margin-top:8px}
 
 button:active{transform:scale(.985)}
@@ -26,7 +26,11 @@ button:disabled{opacity:.45}video,img{width:100%;border-radius:12px;margin-top:1
 <div class="card">
 <div id="stats" class="stats"></div>
 <div id="counter" class="small"></div>
-<div id="article" class="article"></div><div id="location" class="location"></div><div id="gps" class="small"></div>
+<div style="font-size:16px;font-weight:900;margin-top:8px">📦 ARTIKEL DAT JE MOET DOEN</div>
+<div id="article" class="article"></div>
+<div style="font-size:16px;font-weight:900;margin-top:8px">📍 GA NAAR LOCATIE</div>
+<div id="location" class="location"></div>
+<div id="gps" class="small"></div>
 <button id="cam">📷 CAMERA OPENEN</button>
 <button id="help" class="gray">🔐 Camera-toegang herstellen</button>
 <div id="cameraHint" class="status" style="display:none">📸 Maak eerst een foto. Daarna kun je de foto controleren.</div>
@@ -36,9 +40,11 @@ button:disabled{opacity:.45}video,img{width:100%;border-radius:12px;margin-top:1
   <div style="font-size:18px;font-weight:850;margin-top:12px">👀 FOTO CONTROLEREN</div>
   <div class="small">Is de foto duidelijk en staat het juiste artikel erop?</div>
   <img id="preview">
-  <button id="saveNext" class="green">✅ FOTO GOED — OPSLAAN & VOLGEND ARTIKEL</button>
+  <button id="saveNext" class="green">✅ FOTO GOED — OPSLAAN</button>
+  <button id="another" class="green">📸 NOG EEN FOTO VAN DIT ARTIKEL</button>
+  <button id="finishArticle" class="blue">➡️ ARTIKEL KLAAR — VOLGEND ARTIKEL</button>
   <button id="retake" class="gray">📷 OPNIEUW FOTO</button>
-  <button id="nextNoSave" class="yellow">➡️ VOLGEND ARTIKEL — FOTO NIET OPSLAAN</button>
+  <button id="nextNoSave" class="yellow">➡️ VOLGEND ARTIKEL — DEZE FOTO NIET OPSLAAN</button>
 </div>
 <button id="done" class="green" disabled style="display:none">✓ Artikel klaar — volgende</button>
 <button id="skip" class="yellow">⏭️ NIET GEVONDEN / NIET OP VOORRAAD — OVERSLAAN</button>
@@ -85,7 +91,7 @@ function show(){
  $("status").textContent="Ga naar de locatie en neem een foto.";
  currentBlob=null;$("preview").style.display="none";$("reviewBox").style.display="none";$("done").disabled=true;
  stopCameraOnly();
- $("status").textContent="Ga naar de locatie en neem een foto. Controleer de foto vóór je opslaat.";
+ $("status").textContent="Ga naar de locatie hierboven. Neem één of meerdere foto's. De camera sluit na elke foto zodat je eerst kunt controleren.";
  if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>$("gps").textContent=`GPS: ${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)}`,()=>{});
 }
 $("excel").onchange=async e=>{
@@ -156,19 +162,39 @@ $("retake").onclick=()=>{
   openCamera();
 };
 
-$("saveNext").onclick=()=>{
-  if(!currentBlob)return;
+function saveCurrentPhoto(){
+  if(!currentBlob)return false;
   let r=rows[state.index];
   let rd=new FileReader();
   rd.onload=()=>{
     state.photos.push({article:r.article,location:r.location,data:rd.result});
-    state.done.push(r.article);
-    state.index++;
     persist();
     currentBlob=null;
-    show();
+    $("reviewBox").style.display="none";
+    $("preview").style.display="none";
+    $("status").textContent="Foto opgeslagen voor "+r.article+". Je kunt nog een foto nemen van ditzelfde artikel, of het artikel klaarzetten.";
   };
   rd.readAsDataURL(currentBlob);
+  return true;
+}
+
+$("saveNext").onclick=()=>{ saveCurrentPhoto(); };
+
+$("another").onclick=()=>{
+  if(currentBlob) saveCurrentPhoto();
+  setTimeout(()=>openCamera(),180);
+};
+
+$("finishArticle").onclick=()=>{
+  let r=rows[state.index];
+  if(!state.photos.some(p=>p.article===r.article)){
+    if(!confirm("Er is nog geen foto opgeslagen voor "+r.article+". Toch naar het volgende artikel?")) return;
+  }
+  state.done.push(r.article);
+  state.index++;
+  currentBlob=null;
+  persist();
+  show();
 };
 
 $("nextNoSave").onclick=()=>{
