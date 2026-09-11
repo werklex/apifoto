@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>ATS Foto App</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box} body{margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#111827}
 .wrap{max-width:760px;margin:auto;padding:16px 14px 40px}
@@ -25,10 +26,10 @@ input[type=file]{display:none}
 <body>
 <div class="wrap">
 <h1>📋 ATS FOTO APP</h1>
-<div class="sub">Artikelen en locaties uit Excel — kolom A = artikel, kolom B = locatie</div>
+<div class="sub">Online lijst — kolom A = artikel, kolom B = locatie</div>
 
 <div class="card">
-<label class="filebtn primary" for="excelFile">📂 LIJST UPLOADEN</label>
+<label class="filebtn primary" for="excelFile">📂 LIJST UPLOADEN / BIJWERKEN</label>
 <input id="excelFile" type="file" accept=".xlsx,.xls,.csv">
 <div id="listStatus" class="status">Upload je Excel-lijst om te starten.</div>
 </div>
@@ -71,118 +72,281 @@ input[type=file]{display:none}
 
 <script>
 const $=id=>document.getElementById(id);
-let items=[], skipped=new Set(), done=new Set(), photos=[], current=null, stream=null, pendingBlob=null, photoNo=0;
-const STORE='atsFotoStateV3';
 
-function baseArticle(a){ return String(a||'').trim().replace(/_(N|R|U|K)$/i,''); }
-function displayArticle(a){ return String(a||'').trim(); }
-function loadState(){
- try{
-  const s=JSON.parse(localStorage.getItem(STORE)||'{}');
-  done=new Set(s.done||[]); skipped=new Set(s.skipped||[]);
-  items=s.items||[];
-  photos=[]; render();
- }catch(e){}
+// Supabase configuration
+const SUPABASE_URL = 'https://jtxiyimxmleckllirfiu.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_G9IguMo459i5YbrYWihRJw_bXjrCGfp';
+const TABLE_NAME = "werklex's Org";
+const { createClient } = window.supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+let items=[], current=null, stream=null, pendingBlob=null, photoNo=0, sessionPhotos=[];
+
+function baseArticle(a){
+  return String(a||'').trim().replace(/_(N|R|U|K)$/i,'');
 }
-function saveState(){
- localStorage.setItem(STORE,JSON.stringify({items,done:[...done],skipped:[...skipped]}));
+function cleanCell(v){
+  return String(v ?? '').trim().replace(/\\_/g,'_');
 }
-function uniqueItems(rows){
- const map=new Map();
- for(const r of rows){
-  const a=String(r[0]??'').trim(), l=String(r[1]??'').trim();
-  if(!a || !l) continue;
-  if(/^(artikel|article|sparepart)$/i.test(a) && /^(locatie|location|loc)$/i.test(l)) continue;
-  const key=baseArticle(a);
-  if(!map.has(key)) map.set(key,{key,article:a,location:l});
- }
- return [...map.values()];
+function isArticleCode(a){
+  return /^[A-Z0-9]+_(?:N|R|U|K)$/i.test(a);
 }
-function parseWorkbook(data){
- const wb=XLSX.read(data,{type:'array'});
- const ws=wb.Sheets[wb.SheetNames[0]];
- const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
- const oldDone=new Set(done), oldSkipped=new Set(skipped);
- const newItems=uniqueItems(rows);
- items=newItems;
- const valid=new Set(items.map(x=>x.key));
- done=new Set([...oldDone].filter(k=>valid.has(k)));
- skipped=new Set([...oldSkipped].filter(k=>valid.has(k)));
- photos=[];
- current=null;
- saveState(); render();
+function safeName(s){
+  return String(s).replace(/[^\w.-]+/g,'_');
 }
-$('excelFile').onchange=e=>{
- const f=e.target.files[0]; if(!f)return;
- const reader=new FileReader();
- reader.onload=ev=>{try{parseWorkbook(ev.target.result);$('listStatus').textContent=`${items.length} unieke artikelen geladen.`}catch(err){$('listStatus').textContent='Excel kon niet worden gelezen.'}};
- reader.readAsArrayBuffer(f);
-};
-function nextItem(){
- const available=items.filter(x=>!done.has(x.key));
- if(!available.length){current=null;render();return}
- const normal=available.find(x=>!skipped.has(x.key));
- current=normal||available[0];
- photoNo=0; pendingBlob=null;
- $('article').textContent=displayArticle(current.article);
- $('location').textContent=current.location;
- $('cameraArea').classList.remove('hidden'); $('previewArea').classList.add('hidden');
+
+function normalizeRows(rows){
+  // Group _N/_R/_U/_K into one work item.
+  // The first row found supplies the displayed article + location.
+  const map = new Map();
+  for(const r of rows || []){
+    const a = cleanCell(r.artikel);
+    const l = cleanCell(r.locatie);
+    if(!isArticleCode(a) || !l) continue;
+    const key = baseArticle(a);
+    if(!map.has(key)){
+      map.set(key,{
+        key,
+        article:a,
+        location:l,
+        rows:[r]
+      });
+    }else{
+      map.get(key).rows.push(r);
+    }
+  }
+  return [...map.values()];
 }
+
+async function fetchItems(){
+  $('listStatus').textContent='Lijst ophalen van de online database…';
+  const {data,error}=await db
+    .from(TABLE_NAME)
+    .select('id, artikel, locatie, status')
+    .order('id',{ascending:true});
+
+  if(error){
+    console.error(error);
+    $('listStatus').textContent='Fout bij ophalen van de lijst: '+error.message;
+    $('work').classList.add('hidden');
+    return false;
+  }
+
+  items = normalizeRows(data);
+  render();
+  $('listStatus').textContent=`${data.length} regels online → ${items.length} unieke artikelen.`;
+  return true;
+}
+
+function openItems(){
+  return items.filter(x=>{
+    // An article is complete if any matching database row is "klaar".
+    // Otherwise it remains open, including skipped items.
+    return !x.rows.some(r=>String(r.status||'').toLowerCase()==='klaar');
+  });
+}
+
+async function setStatusForCurrent(status){
+  if(!current)return;
+  const ids = current.rows.map(r=>r.id);
+  const {error} = await db
+    .from(TABLE_NAME)
+    .update({status})
+    .in('id', ids);
+
+  if(error){
+    alert('Kon de status niet opslaan: '+error.message);
+    console.error(error);
+    return false;
+  }
+
+  current.rows.forEach(r=>r.status=status);
+  return true;
+}
+
+async function nextItem(){
+  const available = openItems();
+  if(!available.length){
+    current=null;
+    render();
+    return;
+  }
+
+  // Prefer items that weren't skipped, then skipped items.
+  current = available.find(x=>String(x.rows?.[0]?.status||'').toLowerCase()!=='overgeslagen')
+         || available[0];
+
+  photoNo=0;
+  pendingBlob=null;
+  $('article').textContent=current.article;
+  $('location').textContent=current.location;
+  $('cameraArea').classList.remove('hidden');
+  $('previewArea').classList.add('hidden');
+}
+
 function render(){
- $('work').classList.toggle('hidden',items.length===0);
- const left=items.filter(x=>!done.has(x.key)).length;
- $('count').textContent=items.length?`${left} artikel${left===1?'':'en'} nog te doen`:'';
- if(items.length && !current) nextItem();
- if(!items.length){$('listStatus').textContent='Upload je Excel-lijst om te starten.'}
+  const left=openItems().length;
+  $('work').classList.toggle('hidden', items.length===0);
+  $('count').textContent=items.length ? `${left} artikel${left===1?'':'en'} nog te doen` : '';
+  if(items.length && !current) nextItem();
 }
-async function openCamera(){
- try{
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
-  $('video').srcObject=stream;$('video').classList.remove('hidden');
-  await new Promise(r=>setTimeout(r,250));
-  $('canvas').width=$('video').videoWidth;$('canvas').height=$('video').videoHeight;
-  $('canvas').getContext('2d').drawImage($('video'),0,0);
-  stream.getTracks().forEach(t=>t.stop()); stream=null; $('video').srcObject=null; $('video').classList.add('hidden');
-  pendingBlob=await new Promise(r=>$('canvas').toBlob(r,'image/jpeg',.92));
-  showPreview();
- }catch(e){
-  alert('Camera kan niet worden geopend. Controleer in Chrome of camera-toegang voor deze site is toegestaan.');
- }
+
+$('excelFile').onchange = async e => {
+  // The upload button now serves as a list import/synchronization helper.
+  // It updates the online table instead of keeping the list only on this device.
+  const f=e.target.files[0];
+  if(!f)return;
+  try{
+    const reader=new FileReader();
+    reader.onload=async ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        const data=[];
+        for(let i=0;i<rows.length;i++){
+          const a=cleanCell(rows[i][0]), l=cleanCell(rows[i][1]);
+          if(!isArticleCode(a) || !l) continue;
+          data.push({artikel:a,locatie:l,status:null});
+        }
+        if(!data.length){
+          $('listStatus').textContent='Geen geldige artikellijnen gevonden. Kolom A moet artikel zijn en kolom B locatie.';
+          return;
+        }
+        $('listStatus').textContent=`${data.length} geldige Excel-regels gevonden. Online lijst bijwerken…`;
+
+        // For a fresh list import, replace existing list rows.
+        // This action requires the table to permit DELETE/INSERT, so only perform
+        // this when the user explicitly uploads a list.
+        const del = await db.from(TABLE_NAME).delete().not('id','is',null);
+        if(del.error){
+          $('listStatus').textContent='Lijst kon niet vervangen worden: '+del.error.message;
+          return;
+        }
+
+        const chunk=500;
+        for(let i=0;i<data.length;i+=chunk){
+          const ins=await db.from(TABLE_NAME).insert(data.slice(i,i+chunk));
+          if(ins.error){
+            $('listStatus').textContent='Lijst kon niet volledig worden geïmporteerd: '+ins.error.message;
+            return;
+          }
+        }
+        current=null;
+        await fetchItems();
+      }catch(err){
+        console.error(err);
+        $('listStatus').textContent='Excel kon niet worden gelezen.';
+      }
+    };
+    reader.readAsArrayBuffer(f);
+  }catch(err){
+    console.error(err);
+  }
+};
+
+// Camera: open, take one frame, immediately stop camera, show preview.
+$('cameraBtn').onclick=async()=>{
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
+      audio:false
+    });
+    $('video').srcObject=stream;
+    $('video').classList.remove('hidden');
+    await new Promise(r=>setTimeout(r,250));
+    const v=$('video'), c=$('canvas');
+    c.width=v.videoWidth||1280;
+    c.height=v.videoHeight||720;
+    c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+    v.srcObject?.getTracks().forEach(t=>t.stop());
+    stream=null;
+    v.srcObject=null;
+    v.classList.add('hidden');
+
+    pendingBlob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.92));
+    const url=URL.createObjectURL(pendingBlob);
+    $('preview').src=url;
+    photoNo++;
+    $('photoLabel').textContent=`${current.article} — FOTO ${photoNo}`;
+    $('cameraArea').classList.add('hidden');
+    $('previewArea').classList.remove('hidden');
+  }catch(e){
+    alert('Camera kan niet worden geopend. Controleer Chrome en de cameratoestemming voor deze website.');
+  }
+};
+
+$('againBtn').onclick=()=>{
+  pendingBlob=null;
+  $('previewArea').classList.add('hidden');
+  $('cameraArea').classList.remove('hidden');
+};
+
+async function savePhoto(alsoFinish){
+  if(!pendingBlob || !current)return;
+  const sameCount=sessionPhotos.filter(p=>p.key===current.key).length+1;
+  sessionPhotos.push({
+    name:`${safeName(baseArticle(current.article))}_${String(sameCount).padStart(2,'0')}.jpg`,
+    blob:pendingBlob,
+    key:current.key
+  });
+  pendingBlob=null;
+
+  if(alsoFinish){
+    const ok=await setStatusForCurrent('klaar');
+    if(!ok)return;
+    current=null;
+    await nextItem();
+    render();
+  }else{
+    $('previewArea').classList.add('hidden');
+    $('cameraArea').classList.remove('hidden');
+  }
 }
-function showPreview(){
- const url=URL.createObjectURL(pendingBlob);
- $('preview').src=url; photoNo++; $('photoLabel').textContent=`${current.article} — FOTO ${photoNo}`;
- $('cameraArea').classList.add('hidden');$('previewArea').classList.remove('hidden');
-}
-function resetPhoto(){pendingBlob=null;$('previewArea').classList.add('hidden');$('cameraArea').classList.remove('hidden')}
-function safeName(s){return String(s).replace(/[^\w.-]+/g,'_')}
-$('cameraBtn').onclick=openCamera;
-$('againBtn').onclick=()=>{pendingBlob=null;$('previewArea').classList.add('hidden');$('cameraArea').classList.remove('hidden')};
-$('moreBtn').onclick=async()=>{if(pendingBlob)savePhoto(false); await openCamera()};
+
 $('saveBtn').onclick=()=>savePhoto(true);
-function savePhoto(finish){
- if(!pendingBlob||!current)return;
- photos.push({name:`${safeName(baseArticle(current.article))}_${String(photos.filter(p=>p.key===current.key).length+1).padStart(2,'0')}.jpg`,blob:pendingBlob,key:current.key,article:current.article});
- pendingBlob=null;
- if(finish){done.add(current.key);skipped.delete(current.key);saveState();current=null;nextItem();render()}
- else {$('previewArea').classList.add('hidden');$('cameraArea').classList.remove('hidden')}
-}
-$('nextBtn').onclick=()=>{pendingBlob=null;skipped.add(current.key);saveState();current=null;nextItem();render()};
-$('skipBtn').onclick=()=>{$('nextBtn').click()};
-$('stopBtn').onclick=()=>{pendingBlob=null;alert('Voortgang is bewaard. Je kunt later verdergaan.');};
-async function makeZip(){
- if(!photos.length){alert('Er zijn nog geen foto’s gemaakt in deze sessie.');return}
- const JSZip=window.JSZip;
- if(!JSZip){alert('ZIP-module wordt nog geladen. Probeer opnieuw.');return}
- const zip=new JSZip();
- for(const p of photos)zip.file(p.name,p.blob);
- const d=new Date(), pad=n=>String(n).padStart(2,'0');
- const filename=`FOTO_${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()}.zip`;
- const blob=await zip.generateAsync({type:'blob'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
-}
-$('zipBtn').onclick=makeZip;
-loadState();
+$('moreBtn').onclick=async()=>{
+  // Keep the first preview as a saved session photo, but don't finish the article.
+  await savePhoto(false);
+  $('cameraArea').classList.remove('hidden');
+  $('previewArea').classList.add('hidden');
+  $('cameraBtn').click();
+};
+
+$('nextBtn').onclick=async()=>{
+  // "Volgend artikel" without saving means temporary skip, not finished.
+  const ok=await setStatusForCurrent('overgeslagen');
+  if(!ok)return;
+  current=null;
+  await nextItem();
+  render();
+};
+
+$('skipBtn').onclick=()=>$('nextBtn').click();
+
+$('stopBtn').onclick=()=>{
+  pendingBlob=null;
+  alert('Voortgang is online opgeslagen. Je kunt later op eender welke gsm verdergaan.');
+};
+
+$('zipBtn').onclick=async()=>{
+  if(!sessionPhotos.length){
+    alert('Er zijn in deze sessie nog geen foto’s gemaakt.');
+    return;
+  }
+  const zip=new JSZip();
+  for(const p of sessionPhotos) zip.file(p.name,p.blob);
+  const d=new Date(), pad=n=>String(n).padStart(2,'0');
+  const filename=`FOTO_${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()}.zip`;
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
+};
+
+fetchItems();
+
 </script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </body>
