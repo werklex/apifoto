@@ -1,102 +1,189 @@
 <!doctype html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1769e0"><title>ATS Artikel Foto</title>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>ATS Foto App</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f2f5f9;color:#111}main{max-width:700px;margin:auto;padding:10px}
-.card{background:#fff;border-radius:16px;padding:14px;margin-bottom:10px;box-shadow:0 2px 8px #0001}
-.task{position:sticky;top:0;z-index:20;border:3px solid #1769e0}
-.label{font-weight:900;font-size:15px;text-transform:uppercase}.article{font-size:36px;font-weight:900;word-break:break-word;margin:6px 0}
-.location{font-size:25px;font-weight:800;word-break:break-word}.stats{font-weight:800;margin-top:8px}button{width:100%;border:0;border-radius:12px;padding:15px 10px;margin:6px 0;font-size:19px;font-weight:850;min-height:58px}
-.blue{background:#1769e0;color:#fff}.green{background:#1b8a3a;color:#fff}.yellow{background:#f2c230;color:#111}.gray{background:#e4e8ee;color:#111}.red{background:#c62828;color:#fff}
-video{width:100%;max-height:55vh;object-fit:contain;border-radius:12px;background:#111;display:none;margin-top:8px}
-#review{display:none}#preview{width:100%;max-height:55vh;object-fit:contain;border-radius:12px;background:#111;margin-top:8px}
-.status{font-size:17px;font-weight:700;padding:10px;border-radius:10px;background:#eef3f9;margin-top:8px}
-.small{font-size:14px;color:#555}.hidden{display:none!important}
-</style></head><body><main>
-<div class="card task">
-<div class="label">📋 TE DOEN ARTIKEL</div><div id="article" class="article"></div>
-<div class="label">📍 LOCATIE</div><div id="location" class="location"></div>
-<div id="stats" class="stats"></div>
+*{box-sizing:border-box} body{margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#111827}
+.wrap{max-width:760px;margin:auto;padding:16px 14px 40px}
+h1{font-size:28px;margin:8px 0 4px}.sub{color:#64748b;margin-bottom:14px}
+.card{background:white;border-radius:24px;padding:18px;margin:14px 0;box-shadow:0 4px 18px #00000012}
+.job{border:4px solid #1769e0;border-radius:22px;padding:18px;margin-bottom:14px}
+.label{font-weight:800;font-size:18px;color:#475569}.article{font-size:32px;font-weight:900;word-break:break-word;margin:5px 0 14px}.loc{font-size:26px;font-weight:800;word-break:break-word}
+button,.filebtn{width:100%;border:0;border-radius:18px;padding:18px 14px;margin:7px 0;font-size:20px;font-weight:900;cursor:pointer}
+.primary{background:#1769e0;color:#fff}.yellow{background:#f5c400;color:#111}.green{background:#16a34a;color:#fff}.gray{background:#e2e8f0;color:#111827}.red{background:#dc2626;color:white}
+input[type=file]{display:none}
+.status{text-align:center;font-weight:700;color:#475569;padding:6px}.count{text-align:center;font-size:18px;font-weight:800}
+.preview{width:100%;border-radius:18px;display:block;margin:10px 0;max-height:65vh;object-fit:contain;background:#111}
+.small{font-size:14px;color:#64748b;text-align:center}
+.hidden{display:none!important}
+.row{display:flex;gap:8px}.row>*{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>📋 ATS FOTO APP</h1>
+<div class="sub">Artikelen en locaties uit Excel — kolom A = artikel, kolom B = locatie</div>
+
+<div class="card">
+<label class="filebtn primary" for="excelFile">📂 LIJST UPLOADEN</label>
+<input id="excelFile" type="file" accept=".xlsx,.xls,.csv">
+<div id="listStatus" class="status">Upload je Excel-lijst om te starten.</div>
+</div>
+
+<div id="work" class="hidden">
+<div class="job">
+<div class="label">📋 TE DOEN ARTIKEL</div>
+<div id="article" class="article">—</div>
+<div class="label">📍 LOCATIE</div>
+<div id="location" class="loc">—</div>
 </div>
 
 <div class="card">
-<button id="camera" class="blue">📷 CAMERA OPENEN</button>
-<video id="video" autoplay playsinline></video>
-<button id="take" class="green hidden">📸 FOTO MAKEN</button>
-<div id="review">
-<div class="label">👀 VOORBEELDFOTO</div><img id="preview">
-<div id="photoCount" class="status"></div>
-<button id="save" class="green">💾 FOTO OPSLAAN</button>
-<button id="more" class="blue">📸 NOG 1 FOTO VAN DIT ARTIKEL</button>
-<button id="redo" class="gray">🔄 OPNIEUW FOTO</button>
-<button id="next" class="yellow">➡️ VOLGEND ARTIKEL</button>
-<button id="stop" class="red">🛑 STOPPEN VOOR VANDAAG</button>
+<div id="cameraArea">
+<button class="primary" id="cameraBtn">📷 CAMERA OPENEN</button>
+<button class="yellow" id="skipBtn">⏭️ OVERSLAAN — LATER OPNIEUW</button>
 </div>
-<button id="skip" class="yellow">⏭️ OVERSLAAN — LATER OPNIEUW</button>
+
+<div id="previewArea" class="hidden">
+<div id="photoLabel" class="status"></div>
+<img id="preview" class="preview">
+<button class="green" id="saveBtn">💾 FOTO OPSLAAN</button>
+<button class="primary" id="moreBtn">📸 NOG 1 FOTO</button>
+<button class="gray" id="againBtn">🔄 OPNIEUW FOTO</button>
+<button class="primary" id="nextBtn">➡️ VOLGEND ARTIKEL</button>
+<button class="red" id="stopBtn">🛑 STOPPEN VOOR VANDAAG</button>
+</div>
 </div>
 
 <div class="card">
-<button id="send" class="blue">📦 ZIP MAKEN</button>
-<div id="status" class="status"></div>
+<div id="count" class="count"></div>
+<button class="primary" id="zipBtn">📦 ZIP MAKEN</button>
+<div class="small">De ZIP wordt op je gsm opgeslagen als FOTO_DD-MM-JJJJ.zip. Daarna kun je hem handmatig via Outlook versturen.</div>
 </div>
-</main>
+</div>
+</div>
+
+<video id="video" class="hidden" autoplay playsinline></video>
+<canvas id="canvas" class="hidden"></canvas>
+
 <script>
-const rows=[{"article": "MDEL00206_N", "location": "01.01.01.01.02", "variants": ["MDEL00206_N"]}, {"article": "MDEL21621_N", "location": "01.01.08.01.03", "variants": ["MDEL21621_N"]}, {"article": "MDEL00203_N", "location": "01.01.10.01.02", "variants": ["MDEL00203_N"]}, {"article": "MDEL00215_N", "location": "01.01.11.01.03", "variants": ["MDEL00215_N"]}, {"article": "VEIL21353_N", "location": "01.02.11.01.03", "variants": ["VEIL21353_N"]}, {"article": "LIFT20453_N", "location": "01.03.", "variants": ["LIFT20453_N"]}, {"article": "LIFT20422_N", "location": "01.03.18.01.02", "variants": ["LIFT20422_N"]}, {"article": "STOE60014_U", "location": "01.07.08.01.01", "variants": ["STOE60014_U"]}, {"article": "SMIN00013_N", "location": "01.08.24.01.02", "variants": ["SMIN00013_N"]}, {"article": "STOP20009_N", "location": "01.12.03.01.03", "variants": ["STOP20009_N"]}, {"article": "ELKS20040_N", "location": "01.12.16.01.03", "variants": ["ELKS20040_N"]}, {"article": "ELIM20789_N", "location": "01.12.20.01.01", "variants": ["ELIM20789_N"]}, {"article": "FILT22328_N", "location": "01.13.14.01.01", "variants": ["FILT22328_N"]}, {"article": "MDEL21747_N", "location": "01.14", "variants": ["MDEL21747_N"]}, {"article": "RADI20010_N", "location": "01.14.07.01.02", "variants": ["RADI20010_N"]}, {"article": "RADI21153_N", "location": "01.14.20.01.01", "variants": ["RADI21153_N"]}, {"article": "SCHA02753_N", "location": "01.15.07.01.02", "variants": ["SCHA02753_N"]}, {"article": "ASIN20039_N", "location": "01.15.07.01.04", "variants": ["ASIN20039_N"]}, {"article": "ASIN20040_N", "location": "01.15.07.01.04", "variants": ["ASIN20040_N"]}, {"article": "ROLB20075_N", "location": "01.15.19.01.03", "variants": ["ROLB20075_R", "ROLB20075_N"]}, {"article": "ROLB20088_N", "location": "01.15.22.01.05", "variants": ["ROLB20088_N"]}, {"article": "ROLB20063_N", "location": "01.15.24.01.01", "variants": ["ROLB20063_N"]}, {"article": "NILO20024_N", "location": "01.16", "variants": ["NILO20024_N"]}, {"article": "ZPMC01052_U", "location": "01.16.12.01.02", "variants": ["ZPMC01052_U"]}, {"article": "ELIN00009_N", "location": "01.17", "variants": ["ELIN00009_N"]}, {"article": "ELIN00002_N", "location": "01.17.14.01.03", "variants": ["ELIN00002_N"]}, {"article": "HARD60003_N", "location": "01.17.22.01.02", "variants": ["HARD60003_N"]}, {"article": "ITKA20262_N", "location": "01.18.04.01.01", "variants": ["ITKA20262_N"]}, {"article": "ITKA20326_N", "location": "01.18.22.01.02", "variants": ["ITKA20326_N"]}, {"article": "KABA20280_N", "location": "01.19.05.01.02", "variants": ["KABA20280_N"]}, {"article": "KABA60011_N", "location": "01.19.11.01.03", "variants": ["KABA60011_N"]}, {"article": "KABA60013_N", "location": "01.19.12.01.02", "variants": ["KABA60013_N"]}, {"article": "KABA60014_N", "location": "01.19.12.01.03", "variants": ["KABA60014_N"]}, {"article": "KABA20560_U", "location": "01.19.24.01.01", "variants": ["KABA20560_U"]}, {"article": "MEET20785_R", "location": "01.20.18.01.01", "variants": ["MEET20785_R"]}, {"article": "ZPMC29433_U", "location": "01.20.18.01.01", "variants": ["ZPMC29433_U"]}, {"article": "SCHA21432_U", "location": "01.23.03.01.03", "variants": ["SCHA21432_U"]}, {"article": "STOE20231_N", "location": "01.23.15.01.01", "variants": ["STOE20231_N"]}, {"article": "STOE60002_N", "location": "01.23.16.01.01", "variants": ["STOE60002_N"]}, {"article": "STOE60019_N", "location": "01.23.17.01.01", "variants": ["STOE60019_N"]}, {"article": "HGETU20286_N", "location": "01.24.01.01.01", "variants": ["HGETU20286_N"]}, {"article": "HGETU20290_N", "location": "01.24.01.01.02", "variants": ["HGETU20290_N"]}, {"article": "KSTS20004_N", "location": "01.24.03.01.02", "variants": ["KSTS20004_N"]}, {"article": "ZPMC29374_N", "location": "01.62.18.01.01", "variants": ["ZPMC29374_N"]}, {"article": "ZPMC29361_N", "location": "01.62.20.01.03", "variants": ["ZPMC29361_N"]}, {"article": "RACC21575_N", "location": "01.62.22.01.01", "variants": ["RACC21575_N"]}, {"article": "RACC21574_N", "location": "01.62.22.01.02", "variants": ["RACC21574_N"]}, {"article": "RACC21621_N", "location": "01.62.22.01.03", "variants": ["RACC21621_N"]}, {"article": "STIN73036_N", "location": "B.B.05", "variants": ["STIN73036_N"]}, {"article": "KABA20213_N", "location": "B.B.2", "variants": ["KABA20213_N"]}, {"article": "BROM20932_N", "location": "B.B.3", "variants": ["BROM20932_N"]}, {"article": "ZPMC00538_N", "location": "B.B.4", "variants": ["ZPMC00538_N"]}, {"article": "KETR20125_N", "location": "B.C.3", "variants": ["KETR20125_N"]}, {"article": "KETS60004_N", "location": "B.C.4", "variants": ["KETS60004_N"]}, {"article": "RACC00103_N", "location": "B.D.05", "variants": ["RACC00103_N"]}, {"article": "SPRE20378_N", "location": "B.D.3", "variants": ["SPRE20378_N"]}, {"article": "BROM20616_R", "location": "BUITEN", "variants": ["BROM20616_R"]}, {"article": "KATK26363_N", "location": "BUITEN", "variants": ["KATK26363_N"]}, {"article": "KATK26443_N", "location": "BUITEN", "variants": ["KATK26443_N"]}, {"article": "STIN22588_N", "location": "BUITEN", "variants": ["STIN22588_N"]}, {"article": "STIN22589_N", "location": "BUITEN", "variants": ["STIN22589_N", "STIN22589_R"]}, {"article": "BROM20923_N", "location": "C.A.4", "variants": ["BROM20923_N"]}, {"article": "BROM20947_N", "location": "C.A.4", "variants": ["BROM20947_N"]}, {"article": "HARD22312_N", "location": "C.B.2", "variants": ["HARD22312_N"]}, {"article": "KLEM20708_N", "location": "C.C.4", "variants": ["KLEM20708_N"]}, {"article": "SPRE20322_R", "location": "C.D.5", "variants": ["SPRE20322_R"]}, {"article": "ZPMC01000_U", "location": "CONTAINER", "variants": ["ZPMC01000_U"]}, {"article": "CKRN22152_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["CKRN22152_N"]}, {"article": "ELMO20499_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["ELMO20499_N", "ELMO20499_U"]}, {"article": "NELC00022_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC00022_N"]}, {"article": "NELC00028_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC00028_N"]}, {"article": "NELC00035_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC00035_N"]}, {"article": "NELC00036_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC00036_N"]}, {"article": "NELC00038_U", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC00038_U"]}, {"article": "NELC00045_R", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC00045_R"]}, {"article": "NELC20215_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20215_N"]}, {"article": "NELC20711_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20711_N"]}, {"article": "NELC20763_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20763_N"]}, {"article": "NELC20771_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20771_N"]}, {"article": "NELC20787_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20787_N"]}, {"article": "NELC20920_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20920_N"]}, {"article": "NELC20944_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20944_N"]}, {"article": "NELC20968_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20968_N"]}, {"article": "NELC20973_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20973_N"]}, {"article": "NELC20974_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20974_N"]}, {"article": "NELC20976_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20976_N"]}, {"article": "NELC20980_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20980_N"]}, {"article": "NELC20982_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC20982_N"]}, {"article": "NELC21017_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC21017_N"]}, {"article": "NELC21025_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC21025_N"]}, {"article": "NELC21072_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC21072_N"]}, {"article": "NELC21073_N", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["NELC21073_N"]}, {"article": "REMM20503_R", "location": "CONTAINER.NELCONKRAAN.1", "variants": ["REMM20503_R"]}, {"article": "VALM21680_U", "location": "D.A.5", "variants": ["VALM21680_U"]}, {"article": "BROM20559_N", "location": "D.B.1", "variants": ["BROM20559_N"]}, {"article": "BROM65029_N", "location": "D.B.3", "variants": ["BROM65029_N"]}, {"article": "LEID60005_N", "location": "D.C.1", "variants": ["LEID60005_N"]}, {"article": "LEID60006_N", "location": "D.C.1", "variants": ["LEID60006_N"]}, {"article": "STIN20190_R", "location": "D.C.1", "variants": ["STIN20190_R"]}, {"article": "BATT00009_N", "location": "GRIJP.VOORRAADKAST 3.3", "variants": ["BATT00009_N"]}, {"article": "DEUR20014_N", "location": "GRIJP.VOORRAADKAST 4.2", "variants": ["DEUR20014_N"]}, {"article": "ECON21988_N", "location": "GRIJP.VOORRAADKAST 4.3", "variants": ["ECON21988_N"]}, {"article": "ECON21558_N", "location": "GRIJP.VOORRAADKAST 6.3", "variants": ["ECON21558_N"]}, {"article": "ECON06509_N", "location": "GRIJP.VOORRAADKAST 9.1", "variants": ["ECON06509_N"]}, {"article": "BROM20520_N", "location": "Hydraumec", "variants": ["BROM20520_N"]}, {"article": "VERW20269_U", "location": "Jurgen", "variants": ["VERW20269_U"]}, {"article": "HARD22306_U", "location": "KAR LAMPEN REK", "variants": ["HARD22306_U"]}, {"article": "HYSK30813_N", "location": "KD.BUITEN", "variants": ["HYSK30813_N"]}, {"article": "HYSK30814_N", "location": "KD.BUITEN", "variants": ["HYSK30814_N"]}, {"article": "KATK24370_N", "location": "KD.BUITEN", "variants": ["KATK24370_N"]}, {"article": "KATK26180_N", "location": "KD.BUITEN", "variants": ["KATK26180_N"]}, {"article": "KATK16140_N", "location": "KD.BUITEN.A1", "variants": ["KATK16140_N"]}, {"article": "KATK16160_N", "location": "KD.BUITEN.A1", "variants": ["KATK16160_N"]}, {"article": "KATK16215_N", "location": "KD.BUITEN.A2", "variants": ["KATK16215_N"]}, {"article": "KATK16200_N", "location": "KD.BUITEN.A2/B3", "variants": ["KATK16200_N"]}, {"article": "KATK24230_N", "location": "KD.BUITEN.A3", "variants": ["KATK24230_N"]}, {"article": "KATK26240_N", "location": "KD.BUITEN.B2", "variants": ["KATK26240_N"]}, {"article": "KATK26362_N", "location": "KD.BUITEN.B3", "variants": ["KATK26362_N"]}, {"article": "KATK26440_N", "location": "KD.BUITEN.B3", "variants": ["KATK26440_N"]}, {"article": "HYSK24149_N", "location": "KD.BUITEN.B4", "variants": ["HYSK24149_N"]}, {"article": "HYSK24154_N", "location": "KD.BUITEN.B4", "variants": ["HYSK24154_N"]}, {"article": "HYSK15249_N", "location": "KD.BUITEN.B4 / CONTAINER STEUNEN", "variants": ["HYSK15249_N"]}, {"article": "KATK28522_N", "location": "KD.BUITEN.C", "variants": ["KATK28522_N"]}, {"article": "KATK28315_N", "location": "KD.BUITEN.C3", "variants": ["KATK28315_N"]}, {"article": "KATK28345_N", "location": "KD.BUITEN.C3", "variants": ["KATK28345_N"]}, {"article": "KATK28478_N", "location": "KD.BUITEN.C3", "variants": ["KATK28478_N"]}, {"article": "HYSK15276_N", "location": "KD.BUITEN.C4", "variants": ["HYSK15276_N"]}, {"article": "KATK28520_N", "location": "KD.BUITEN.C4", "variants": ["KATK28520_N"]}, {"article": "HYSK10060_N", "location": "KD.BUITEN.CONTAINER STEUNEN", "variants": ["HYSK10060_N"]}, {"article": "HYSK22048_N", "location": "KD.BUITEN.CONTAINER STEUNEN", "variants": ["HYSK22048_N"]}, {"article": "HYSK22049_N", "location": "KD.BUITEN.CONTAINER STEUNEN", "variants": ["HYSK22049_N"]}, {"article": "KATK12025_N", "location": "KD.BUITEN.CONTAINER STEUNEN", "variants": ["KATK12025_N"]}, {"article": "HYSK28652_N", "location": "KD.BUITEN.D1", "variants": ["HYSK28652_N"]}, {"article": "HYSK30830_N", "location": "KD.BUITEN.D2", "variants": ["HYSK30830_N"]}, {"article": "HYSK30831_N", "location": "KD.BUITEN.D2", "variants": ["HYSK30831_N"]}, {"article": "HYSK30811_N", "location": "KD.BUITEN.D3", "variants": ["HYSK30811_N"]}, {"article": "HYSK30812_N", "location": "KD.BUITEN.D3", "variants": ["HYSK30812_N"]}, {"article": "HYSK28653_N", "location": "KD.BUITEN.D4", "variants": ["HYSK28653_N"]}, {"article": "HYSK30800_N", "location": "KD.BUITEN.D4", "variants": ["HYSK30800_N"]}, {"article": "HYSK30805_N", "location": "KD.BUITEN.D4", "variants": ["HYSK30805_N"]}, {"article": "HYSK30806_N", "location": "KD.BUITEN.D4", "variants": ["HYSK30806_N"]}, {"article": "HYSK30665_N", "location": "KD.BUITEN.E1/E2", "variants": ["HYSK30665_N"]}, {"article": "HYSK30712_N", "location": "KD.BUITEN.E1/E3", "variants": ["HYSK30712_N"]}, {"article": "KSTS00010_R", "location": "KD7.SCHIJVENREK", "variants": ["KSTS00010_R"]}, {"article": "KSTS00011_R", "location": "KD7.SCHIJVENREK", "variants": ["KSTS00011_R"]}, {"article": "KSTS00020_R", "location": "KD7.SCHIJVENREK", "variants": ["KSTS00020_R"]}, {"article": "KSTS00021_N", "location": "KD7.SCHIJVENREK", "variants": ["KSTS00021_N", "KSTS00021_R"]}, {"article": "NELC20939_R", "location": "KD7.SCHIJVENREK", "variants": ["NELC20939_R"]}, {"article": "ZPMC29126_R", "location": "KD7.SCHIJVENREK", "variants": ["ZPMC29126_R"]}, {"article": "ZPMC29362_N", "location": "KD7.SCHIJVENREK", "variants": ["ZPMC29362_N"]}, {"article": "SCHA60052_U", "location": "LABO", "variants": ["SCHA60052_U"]}, {"article": "ZPMC29342_N", "location": "LABO", "variants": ["ZPMC29342_N"]}, {"article": "ZPMC29343_N", "location": "LABO", "variants": ["ZPMC29343_N"]}, {"article": "CKRN22136_N", "location": "REK.B.03", "variants": ["CKRN22136_N"]}, {"article": "CKRN22137_N", "location": "REK.B.03", "variants": ["CKRN22137_N"]}, {"article": "MEET20816_N", "location": "REK.B.04", "variants": ["MEET20816_N"]}, {"article": "MEET20818_N", "location": "REK.B.04", "variants": ["MEET20818_N"]}, {"article": "KSTS00770_N", "location": "REK.C.00", "variants": ["KSTS00770_N"]}, {"article": "KSTS20037_U", "location": "REK.C.00", "variants": ["KSTS20037_U"]}, {"article": "KSTS00140_R", "location": "REK.C.02", "variants": ["KSTS00140_R"]}, {"article": "KSTS00009_R", "location": "REK.C.03", "variants": ["KSTS00009_R", "KSTS00009_U"]}, {"article": "KSTS01170_N", "location": "REK.C.03", "variants": ["KSTS01170_N"]}, {"article": "KSTS01200_N", "location": "REK.C.03", "variants": ["KSTS01200_N"]}, {"article": "KSTS01210_N", "location": "REK.C.03", "variants": ["KSTS01210_N"]}, {"article": "ELDR20518_N", "location": "REK.D.00", "variants": ["ELDR20518_N"]}, {"article": "ZPMC01036_U", "location": "REK.D.00", "variants": ["ZPMC01036_U"]}, {"article": "VENT20878_N", "location": "REK.D.02", "variants": ["VENT20878_N"]}, {"article": "ZPMC29232_N", "location": "REK.D.03", "variants": ["ZPMC29232_N"]}, {"article": "ELMO20747_U", "location": "REK.E.01", "variants": ["ELMO20747_U"]}, {"article": "NELC20091_N", "location": "REK.E.01", "variants": ["NELC20091_N"]}, {"article": "ELKA20385_N", "location": "REK.E.03", "variants": ["ELKA20385_N"]}, {"article": "ELKA20605_N", "location": "REK.E.03", "variants": ["ELKA20605_N"]}, {"article": "PLAT20339_N", "location": "REK.F.00", "variants": ["PLAT20339_N"]}, {"article": "PLAT20301_N", "location": "REK.F.01", "variants": ["PLAT20301_N"]}, {"article": "ELMO20756_R", "location": "REK.F.02", "variants": ["ELMO20756_R"]}, {"article": "KABA20319_N", "location": "REK.F.02", "variants": ["KABA20319_N"]}, {"article": "KABA20559_N", "location": "REK.F.02", "variants": ["KABA20559_N"]}, {"article": "REMM20579_N", "location": "REK.F.02", "variants": ["REMM20579_N"]}, {"article": "REMM20589_R", "location": "REK.F.03", "variants": ["REMM20589_R"]}, {"article": "ELDR20324_U", "location": "REK.G.00", "variants": ["ELDR20324_U"]}, {"article": "ELDR20513_R", "location": "REK.G.00", "variants": ["ELDR20513_R"]}, {"article": "ELMO20676_R", "location": "REK.G.00", "variants": ["ELMO20676_R"]}, {"article": "ELDR20508_R", "location": "REK.G.01", "variants": ["ELDR20508_R", "ELDR20508_U"]}, {"article": "STOE20217_U", "location": "REK.G.01", "variants": ["STOE20217_U"]}, {"article": "ARMA20437_N", "location": "REK.G.02", "variants": ["ARMA20437_N"]}, {"article": "LIFT20472_N", "location": "REK.G.02", "variants": ["LIFT20472_N"]}, {"article": "REMM20600_R", "location": "REK.G.03", "variants": ["REMM20600_R"]}, {"article": "ARMA20548_N", "location": "REK.H.01", "variants": ["ARMA20548_N"]}, {"article": "HALO20057_N", "location": "REK.H.01", "variants": ["HALO20057_N"]}, {"article": "ARMA20405_N", "location": "REK.H.02", "variants": ["ARMA20405_N"]}, {"article": "ARMA20439_N", "location": "REK.H.02", "variants": ["ARMA20439_N"]}, {"article": "ELIM50201_N", "location": "REK.H.02", "variants": ["ELIM50201_N"]}, {"article": "FLUO20101_N", "location": "REK.H.02", "variants": ["FLUO20101_N"]}, {"article": "FLUO20102_N", "location": "REK.H.02", "variants": ["FLUO20102_N"]}, {"article": "FLUO20103_N", "location": "REK.H.02", "variants": ["FLUO20103_N"]}, {"article": "HALO20050_N", "location": "REK.H.02", "variants": ["HALO20050_N"]}, {"article": "LAMP75002_N", "location": "REK.H.02", "variants": ["LAMP75002_N"]}, {"article": "ONTL00007_N", "location": "REK.H.02", "variants": ["ONTL00007_N"]}, {"article": "STAR20033_N", "location": "REK.H.02", "variants": ["STAR20033_N"]}, {"article": "FLUO00003_N", "location": "REK.H.03", "variants": ["FLUO00003_N"]}, {"article": "FLUO20043_N", "location": "REK.H.03", "variants": ["FLUO20043_N"]}, {"article": "FLUO20056_N", "location": "REK.H.03", "variants": ["FLUO20056_N"]}, {"article": "BROM20954_U", "location": "REK.STINIS.01", "variants": ["BROM20954_U"]}, {"article": "STIN20166_U", "location": "REK.STINIS.01", "variants": ["STIN20166_U"]}, {"article": "STIN22482_N", "location": "REK.STINIS.02", "variants": ["STIN22482_N"]}, {"article": "STIN20104_N", "location": "REK.STINIS.04", "variants": ["STIN20104_N"]}, {"article": "STIN20112_N", "location": "REK.STINIS.05", "variants": ["STIN20112_N"]}, {"article": "STIN22595_N", "location": "REK.STINIS.05", "variants": ["STIN22595_N"]}, {"article": "STIN22558_N", "location": "REK.STINIS.08", "variants": ["STIN22558_N"]}, {"article": "STIN22738_N", "location": "REK.STINIS.08", "variants": ["STIN22738_N"]}, {"article": "STIN22636_N", "location": "REK.STINIS.09", "variants": ["STIN22636_N"]}, {"article": "STIN22637_N", "location": "REK.STINIS.09", "variants": ["STIN22637_N"]}, {"article": "STIN22725_N", "location": "REK.STINIS.09", "variants": ["STIN22725_N"]}, {"article": "STIN22569_U", "location": "REK.STINIS.12", "variants": ["STIN22569_U"]}, {"article": "SCHA21587_N", "location": "REK.STINIS.13", "variants": ["SCHA21587_N"]}, {"article": "STIN22598_N", "location": "REK.STINIS.15", "variants": ["STIN22598_N"]}, {"article": "STIN22690_N", "location": "REK.STINIS.15", "variants": ["STIN22690_N"]}, {"article": "STIN22703_N", "location": "REK.STINIS.15", "variants": ["STIN22703_N"]}, {"article": "POMP20733_N", "location": "REK.STINIS.16", "variants": ["POMP20733_N"]}, {"article": "STIN22508_N", "location": "REK.STINIS.16", "variants": ["STIN22508_N"]}];
-const KEY="ats_foto_v4";
-let state={done:[],skipped:[],photos:[],index:0};
-let stream=null,currentBlob=null;
-
 const $=id=>document.getElementById(id);
-function base(a){return a.replace(/_[NRUK]$/,"")}
-function load(){try{let x=JSON.parse(localStorage.getItem(KEY));if(x)state=x}catch(e){}}
-function persist(){localStorage.setItem(KEY,JSON.stringify(state))}
-function activeRows(){return rows.filter(r=>!state.done.includes(base(r.article))) }
-function current(){return activeRows()[state.index]}
-function show(){
- stopCamera();
- let ar=activeRows();
- if(!ar.length){
-   $("article").textContent="KLAAR 🎉";$("location").textContent="Alle afgewerkte artikelen zijn weg.";
-   $("stats").textContent=`Foto's: ${state.photos.length} • Overgeslagen: ${state.skipped.length}`;
-   $("camera").classList.add("hidden");$("skip").classList.add("hidden");return;
+let items=[], skipped=new Set(), done=new Set(), photos=[], current=null, stream=null, pendingBlob=null, photoNo=0;
+const STORE='atsFotoStateV3';
+
+function baseArticle(a){ return String(a||'').trim().replace(/_(N|R|U|K)$/i,''); }
+function displayArticle(a){ return String(a||'').trim(); }
+function loadState(){
+ try{
+  const s=JSON.parse(localStorage.getItem(STORE)||'{}');
+  done=new Set(s.done||[]); skipped=new Set(s.skipped||[]);
+  items=s.items||[];
+  photos=[]; render();
+ }catch(e){}
+}
+function saveState(){
+ localStorage.setItem(STORE,JSON.stringify({items,done:[...done],skipped:[...skipped]}));
+}
+function uniqueItems(rows){
+ const map=new Map();
+ for(const r of rows){
+  const a=String(r[0]??'').trim(), l=String(r[1]??'').trim();
+  if(!a || !l) continue;
+  if(/^(artikel|article|sparepart)$/i.test(a) && /^(locatie|location|loc)$/i.test(l)) continue;
+  const key=baseArticle(a);
+  if(!map.has(key)) map.set(key,{key,article:a,location:l});
  }
- if(state.index>=ar.length)state.index=0;
- let r=ar[state.index];
- $("article").textContent=r.article;
- $("location").textContent="📍 "+(r.location||"Geen locatie");
- $("stats").textContent=`Artikel ${state.index+1} van ${ar.length} • Foto's opgeslagen: ${state.photos.length} • Overgeslagen: ${state.skipped.length}`;
- $("status").textContent="Ga naar de locatie. Maak een foto en controleer het voorbeeld.";
- $("review").style.display="none";currentBlob=null;
+ return [...map.values()];
+}
+function parseWorkbook(data){
+ const wb=XLSX.read(data,{type:'array'});
+ const ws=wb.Sheets[wb.SheetNames[0]];
+ const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+ const oldDone=new Set(done), oldSkipped=new Set(skipped);
+ const newItems=uniqueItems(rows);
+ items=newItems;
+ const valid=new Set(items.map(x=>x.key));
+ done=new Set([...oldDone].filter(k=>valid.has(k)));
+ skipped=new Set([...oldSkipped].filter(k=>valid.has(k)));
+ photos=[];
+ current=null;
+ saveState(); render();
+}
+$('excelFile').onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const reader=new FileReader();
+ reader.onload=ev=>{try{parseWorkbook(ev.target.result);$('listStatus').textContent=`${items.length} unieke artikelen geladen.`}catch(err){$('listStatus').textContent='Excel kon niet worden gelezen.'}};
+ reader.readAsArrayBuffer(f);
+};
+function nextItem(){
+ const available=items.filter(x=>!done.has(x.key));
+ if(!available.length){current=null;render();return}
+ const normal=available.find(x=>!skipped.has(x.key));
+ current=normal||available[0];
+ photoNo=0; pendingBlob=null;
+ $('article').textContent=displayArticle(current.article);
+ $('location').textContent=current.location;
+ $('cameraArea').classList.remove('hidden'); $('previewArea').classList.add('hidden');
+}
+function render(){
+ $('work').classList.toggle('hidden',items.length===0);
+ const left=items.filter(x=>!done.has(x.key)).length;
+ $('count').textContent=items.length?`${left} artikel${left===1?'':'en'} nog te doen`:'';
+ if(items.length && !current) nextItem();
+ if(!items.length){$('listStatus').textContent='Upload je Excel-lijst om te starten.'}
 }
 async function openCamera(){
  try{
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false});
-  $("video").srcObject=stream;$("video").style.display="block";$("take").classList.remove("hidden");$("camera").classList.add("hidden");
-  $("skip").classList.add("hidden");$("status").textContent="Camera open. Maak de foto.";
- }catch(e){alert("Camera kan niet worden geopend. Controleer in Chrome dat deze website cameratoegang heeft.")}
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  $('video').srcObject=stream;$('video').classList.remove('hidden');
+  await new Promise(r=>setTimeout(r,250));
+  $('canvas').width=$('video').videoWidth;$('canvas').height=$('video').videoHeight;
+  $('canvas').getContext('2d').drawImage($('video'),0,0);
+  stream.getTracks().forEach(t=>t.stop()); stream=null; $('video').srcObject=null; $('video').classList.add('hidden');
+  pendingBlob=await new Promise(r=>$('canvas').toBlob(r,'image/jpeg',.92));
+  showPreview();
+ }catch(e){
+  alert('Camera kan niet worden geopend. Controleer in Chrome of camera-toegang voor deze site is toegestaan.');
+ }
 }
-function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$("video").srcObject=null;$("video").style.display="none";$("take").classList.add("hidden");$("camera").classList.remove("hidden")}
-$("camera").onclick=openCamera;
-$("take").onclick=()=>{
- let v=$("video"),c=document.createElement("canvas");c.width=v.videoWidth||1280;c.height=v.videoHeight||720;c.getContext("2d").drawImage(v,0,0,c.width,c.height);
- c.toBlob(b=>{currentBlob=b;stopCamera();$("preview").src=URL.createObjectURL(b);$("review").style.display="block";$("photoCount").textContent=`Voorbeeld van foto voor ${current().article}. Opgeslagen foto's van dit artikel: ${state.photos.filter(p=>base(p.article)===base(current().article)).length}`; $("status").textContent="Kies wat je met deze foto wilt doen.";},"image/jpeg",.9);
-};
-$("save").onclick=()=>{
- if(!currentBlob)return;let r=current(),rd=new FileReader();rd.onload=()=>{state.photos.push({article:r.article,location:r.location,data:rd.result});state.done.push(base(r.article));state.skipped=state.skipped.filter(x=>x!==base(r.article));persist();show();};rd.readAsDataURL(currentBlob);
-};
-$("more").onclick=()=>{if(!currentBlob)return;let r=current(),rd=new FileReader();rd.onload=()=>{state.photos.push({article:r.article,location:r.location,data:rd.result});persist();currentBlob=null;$("review").style.display="none";$("status").textContent="Foto opgeslagen. Je kunt nog een foto maken van hetzelfde artikel.";openCamera();};rd.readAsDataURL(currentBlob)};
-$("redo").onclick=()=>{currentBlob=null;$("review").style.display="none";openCamera()};
-$("next").onclick=()=>{currentBlob=null;$("review").style.display="none";state.skipped.push(base(current().article));state.index=0;persist();show()};
-$("stop").onclick=()=>{currentBlob=null;stopCamera();$("review").style.display="none";persist();$("status").textContent="Gestopt voor vandaag. Alles is bewaard. Morgen verder."};
-$("skip").onclick=()=>{let r=current();state.skipped.push(base(r.article));state.index=0;persist();show()};persist();show()}};
-$("send").onclick=async()=>{
- if(!state.photos.length){alert("Er zijn nog geen opgeslagen foto's.");return}
- if(!window.JSZip)await new Promise((ok,no)=>{let s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)});
- let z=new JSZip(),f=z.folder("artikel_fotos"),counts={};
- for(let p of state.photos){let n=p.article+".jpg",b=base(p.article),i=1;while(counts[n])n=b+"_"+(++i)+".jpg";counts[n]=1;f.file(n,p.data.split(",")[1],{base64:true})}
- let txt=state.skipped.length?state.skipped.join("\n"):"Geen overgeslagen artikelen.";
- z.file("LATER_TE_DOEN.txt",txt);let blob=await z.generateAsync({type:"blob",compression:"DEFLATE"});
- let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="FOTO_"+new Date().toLocaleDateString("nl-BE").replaceAll("/","-")+".zip";a.click();
-};
-load();show();
-</script></body></html>
+function showPreview(){
+ const url=URL.createObjectURL(pendingBlob);
+ $('preview').src=url; photoNo++; $('photoLabel').textContent=`${current.article} — FOTO ${photoNo}`;
+ $('cameraArea').classList.add('hidden');$('previewArea').classList.remove('hidden');
+}
+function resetPhoto(){pendingBlob=null;$('previewArea').classList.add('hidden');$('cameraArea').classList.remove('hidden')}
+function safeName(s){return String(s).replace(/[^\w.-]+/g,'_')}
+$('cameraBtn').onclick=openCamera;
+$('againBtn').onclick=()=>{pendingBlob=null;$('previewArea').classList.add('hidden');$('cameraArea').classList.remove('hidden')};
+$('moreBtn').onclick=async()=>{if(pendingBlob)savePhoto(false); await openCamera()};
+$('saveBtn').onclick=()=>savePhoto(true);
+function savePhoto(finish){
+ if(!pendingBlob||!current)return;
+ photos.push({name:`${safeName(baseArticle(current.article))}_${String(photos.filter(p=>p.key===current.key).length+1).padStart(2,'0')}.jpg`,blob:pendingBlob,key:current.key,article:current.article});
+ pendingBlob=null;
+ if(finish){done.add(current.key);skipped.delete(current.key);saveState();current=null;nextItem();render()}
+ else {$('previewArea').classList.add('hidden');$('cameraArea').classList.remove('hidden')}
+}
+$('nextBtn').onclick=()=>{pendingBlob=null;skipped.add(current.key);saveState();current=null;nextItem();render()};
+$('skipBtn').onclick=()=>{$('nextBtn').click()};
+$('stopBtn').onclick=()=>{pendingBlob=null;alert('Voortgang is bewaard. Je kunt later verdergaan.');};
+async function makeZip(){
+ if(!photos.length){alert('Er zijn nog geen foto’s gemaakt in deze sessie.');return}
+ const JSZip=window.JSZip;
+ if(!JSZip){alert('ZIP-module wordt nog geladen. Probeer opnieuw.');return}
+ const zip=new JSZip();
+ for(const p of photos)zip.file(p.name,p.blob);
+ const d=new Date(), pad=n=>String(n).padStart(2,'0');
+ const filename=`FOTO_${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()}.zip`;
+ const blob=await zip.generateAsync({type:'blob'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
+}
+$('zipBtn').onclick=makeZip;
+loadState();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</body>
+</html>
