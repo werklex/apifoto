@@ -37,7 +37,6 @@ video{width:100%;max-height:55vh;object-fit:contain;border-radius:12px;backgroun
 
 <div class="card">
 <button id="send" class="blue">📦 ZIP MAKEN</button>
-<button id="reset" class="red">⚠️ ALLES RESETTEN</button>
 <div id="status" class="status"></div>
 </div>
 </main>
@@ -83,14 +82,13 @@ $("take").onclick=()=>{
  c.toBlob(b=>{currentBlob=b;stopCamera();$("preview").src=URL.createObjectURL(b);$("review").style.display="block";$("photoCount").textContent=`Voorbeeld van foto voor ${current().article}. Opgeslagen foto's van dit artikel: ${state.photos.filter(p=>base(p.article)===base(current().article)).length}`; $("status").textContent="Kies wat je met deze foto wilt doen.";},"image/jpeg",.9);
 };
 $("save").onclick=()=>{
- if(!currentBlob)return;let r=current(),rd=new FileReader();rd.onload=()=>{state.photos.push({article:r.article,location:r.location,data:rd.result});state.done.push(base(r.article));state.skipped=state.skipped.filter(x=>x!==base(r.article));state.index=0;persist();show();};rd.readAsDataURL(currentBlob);
+ if(!currentBlob)return;let r=current(),rd=new FileReader();rd.onload=()=>{state.photos.push({article:r.article,location:r.location,data:rd.result});state.done.push(base(r.article));state.skipped=state.skipped.filter(x=>x!==base(r.article));persist();show();};rd.readAsDataURL(currentBlob);
 };
 $("more").onclick=()=>{if(!currentBlob)return;let r=current(),rd=new FileReader();rd.onload=()=>{state.photos.push({article:r.article,location:r.location,data:rd.result});persist();currentBlob=null;$("review").style.display="none";$("status").textContent="Foto opgeslagen. Je kunt nog een foto maken van hetzelfde artikel.";openCamera();};rd.readAsDataURL(currentBlob)};
 $("redo").onclick=()=>{currentBlob=null;$("review").style.display="none";openCamera()};
 $("next").onclick=()=>{currentBlob=null;$("review").style.display="none";state.skipped.push(base(current().article));state.index=0;persist();show()};
 $("stop").onclick=()=>{currentBlob=null;stopCamera();$("review").style.display="none";persist();$("status").textContent="Gestopt voor vandaag. Alles is bewaard. Morgen verder."};
-$("skip").onclick=()=>{let r=current();state.skipped.push(base(r.article));state.index=0;persist();show()};
-$("reset").onclick=()=>{if(confirm("Alles wissen en helemaal opnieuw beginnen? Dit verwijdert ook alle foto's uit deze app.")){state={done:[],skipped:[],photos:[],index:0};persist();show()}};
+$("skip").onclick=()=>{let r=current();state.skipped.push(base(r.article));state.index=0;persist();show()};persist();show()}};
 $("send").onclick=async()=>{
  if(!state.photos.length){alert("Er zijn nog geen opgeslagen foto's.");return}
  if(!window.JSZip)await new Promise((ok,no)=>{let s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=ok;s.onerror=no;document.head.appendChild(s)});
@@ -98,7 +96,7 @@ $("send").onclick=async()=>{
  for(let p of state.photos){let n=p.article+".jpg",b=base(p.article),i=1;while(counts[n])n=b+"_"+(++i)+".jpg";counts[n]=1;f.file(n,p.data.split(",")[1],{base64:true})}
  let txt=state.skipped.length?state.skipped.join("\n"):"Geen overgeslagen artikelen.";
  z.file("LATER_TE_DOEN.txt",txt);let blob=await z.generateAsync({type:"blob",compression:"DEFLATE"});
- let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ATS_artikel_fotos.zip";a.click();
+ let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="FOTO_"+new Date().toLocaleDateString("nl-BE").replaceAll("/","-")+".zip";a.click();
 };
 load();show();
 </script></body></html>
